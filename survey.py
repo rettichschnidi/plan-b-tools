@@ -117,7 +117,7 @@ def plot(session):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scan', nargs=2, help="<interface> <description>")
+    parser.add_argument('--scan', nargs=2, metavar=('<interface>', '<description>'))
     parser.add_argument('--database', default='plan-b-survey.db')
     parser.add_argument('--plot', action='store_true', help="Show a plot of all available data")
     args = parser.parse_args()

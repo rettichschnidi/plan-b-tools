@@ -89,7 +89,7 @@ def analyze(scan_object, session):
     session.commit()
 
 
-def plot(session):
+def plot(session, filter_regex):
     networks = {}
     scans = session.query(Scan).all()
     scan_count = len(scans)
@@ -104,7 +104,8 @@ def plot(session):
 
     fig, ax = plt.subplots(figsize=(20, 10))
     for essid, value in networks.items():
-        plt.plot(value, label=essid, marker="x")
+        if re.match(filter_regex, essid):
+            plt.plot(value, label=essid, marker="x")
 
     plt.xlabel('Location/Time')
     plt.ylabel('Quality')
@@ -119,7 +120,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--scan', nargs=2, metavar=('<interface>', '<description>'))
     parser.add_argument('--database', default='plan-b-survey.db')
-    parser.add_argument('--plot', action='store_true', help="Show a plot of all available data")
+    parser.add_argument('--plot', nargs=1, metavar=('<network_regex>'),
+                        help="Plot specified networks ('.*' for all)")
     args = parser.parse_args()
 
     if not (args.scan or args.plot):
@@ -133,7 +135,7 @@ def main():
         analyze(scan_object, session)
 
     if args.plot:
-        plot(session)
+        plot(session, args.plot[0])
 
 
 if __name__ == '__main__':

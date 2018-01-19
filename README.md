@@ -7,7 +7,7 @@ Simple tool to measure and rank the signal strength of wireless access points.
 
 ### Installation ###
 ```
-apt install python3-sqlalchemy python3-matplotlib
+sudo apt install python3-sqlalchemy python3-matplotlib
 ```
 
 ### Collecting Samples ###
@@ -15,7 +15,7 @@ apt install python3-sqlalchemy python3-matplotlib
 ./survey.py --scan wlp3s0 Büro
 ```
 
-`wlp3s0` is the WiFi interface to use, `Büro` the location of my Notebook.
+`wlp3s0` is the WiFi interface to use, `Büro` is the location of my Notebook.
 
 
 ### Displaying Results ###

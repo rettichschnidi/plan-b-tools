@@ -93,19 +93,22 @@ def plot(session, filter_regex):
     networks = {}
     scans = session.query(Scan).all()
     scan_count = len(scans)
-    for unique_ssid_results in session.query(Result.essid).distinct():
-        networks[unique_ssid_results.essid] = [0 for x in range(scan_count)]
+    for result in session.query(Result).distinct(Result.mac):
+        networks[result.mac] = {
+            'label': "{} ({})".format(result.essid, result.mac),
+            'data': [0 for x in range(scan_count)]
+        }
 
     for index, scan in enumerate(session.query(Scan).all()):
         # print("Scan '{}' at {}:".format(scan.description, scan.time))
         for result in session.query(Result).filter(Result.scan == scan):
-            networks[result.essid][index] = result.quality
+            networks[result.mac]['data'][index] = result.quality
             # print(" {}: {}".format(result.essid, result.quality))
 
     fig, ax = plt.subplots(figsize=(20, 10))
-    for essid, value in networks.items():
-        if re.match(filter_regex, essid):
-            plt.plot(value, label=essid, marker="x")
+    for key, value in networks.items():
+        if re.match(filter_regex, value['label']):
+            plt.plot(value['data'], label=value['label'], marker="x")
 
     plt.xlabel('Location/Time')
     plt.ylabel('Quality')

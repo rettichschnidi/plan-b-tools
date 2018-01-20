@@ -123,7 +123,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--scan', nargs=2, metavar=('<interface>', '<description>'))
     parser.add_argument('--database', default='plan-b-wifi-strength.db')
-    parser.add_argument('--plot', nargs=1, metavar=('<network_regex>'),
+    parser.add_argument('--plot', nargs=1, metavar='<network_regex>',
                         help="Plot specified networks ('.*' for all)")
     args = parser.parse_args()
 

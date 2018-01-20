@@ -12,7 +12,7 @@ sudo apt install python3-sqlalchemy python3-matplotlib
 
 ### Collecting Samples ###
 ```
-./survey.py --scan wlp3s0 Büro
+./wifi-strength.py --scan wlp3s0 Büro
 ```
 
 `wlp3s0` is the WiFi interface to use, `Büro` is the location of my Notebook.
@@ -20,5 +20,5 @@ sudo apt install python3-sqlalchemy python3-matplotlib
 
 ### Displaying Results ###
 ```
-./survey.py --plot
+./wifi-strength.py --plot
 ```

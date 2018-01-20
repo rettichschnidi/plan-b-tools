@@ -1,50 +1,35 @@
 #!/usr/bin/env python3
 import argparse
+import datetime
 import re
-import subprocess
 import sys
 
 import matplotlib.pyplot as plt
-from sqlalchemy import Integer, Column, Text, DateTime, func, ForeignKey, String, create_engine, Float
+from pip._vendor import requests
+from sqlalchemy import Integer, Column, Text, DateTime, func, create_engine, Float
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker
 
 Base = declarative_base()
 
 
-class Scan(Base):
-    __tablename__ = 'scan'
+class ExitIp(Base):
+    __tablename__ = 'exit_ip'
     id = Column(Integer, primary_key=True)
-    description = Column(Text, nullable=False)
     time = Column(DateTime, default=func.now())
-    data = Column(Text, nullable=False)
+    ip = Column(Text)
 
 
-class Result(Base):
-    __tablename__ = 'result'
-    scan_id = Column(ForeignKey(Scan.id), primary_key=True)
-    mac = Column(String(17), nullable=False, primary_key=True)
-    essid = Column(String(32), nullable=False)
-    quality = Column(Float, nullable=False)
-    signal_level = Column(Text, nullable=False)
-    frequency = Column(Text, nullable=False)
-    channel = Column(Integer, nullable=False)
-
-    scan = relationship(Scan)
-
-
-def scan(interface, description, session):
-    result = subprocess.run(['sudo', 'iwlist', interface, 'scan'], stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-    if result.stderr:
-        print(result.stderr.decode('utf-8'), file=sys.stderr)
-    if result.stderr or result.returncode:
-        exit(-1)
-
-    result_entry = Scan(description=description, data=result.stdout.decode('utf-8'))
-    session.add(result_entry)
-    session.commit()
-    return result_entry
+class Speedtest(Base):
+    __tablename__ = 'speed'
+    id = Column(Integer, primary_key=True)
+    time = Column(DateTime, default=func.now())
+    url = Column(Text, nullable=False)
+    duration = Column(Float)
+    file_size = Column(Integer, default=0)
+    bytes_per_second = Column(Float, default=0)
+    http_code = Column(Integer, default=None)
+    exit_ip = Column(Text)
 
 
 def create_db_session(filename):
@@ -54,66 +39,62 @@ def create_db_session(filename):
     return sessionmaker(bind=engine)()
 
 
-def analyze(scan_object, session):
-    assert scan_object.data
-
-    current_result = None
-    for line in scan_object.data.splitlines():
-        line = line.strip()
-        m = re.match(r'^Cell \d+ - Address: (?P<mac>.+)', line)
-        if m:
-            assert current_result is None
-            current_result = Result(scan_id=scan_object.id, mac=m.group('mac'))
-            continue
-
-        m = re.match(r"Frequency:(?P<frequency>.+) GHz \(Channel (?P<channel>\d+)\)$", line)
-        if m:
-            current_result.frequency = m.group('frequency')
-            current_result.channel = m.group('channel')
-            continue
-
-        m = re.match(
-            r"Quality=(?P<quality_nominator>\d+)/(?P<quality_denominator>\d+)  Signal level=(?P<signal_level>.+) dBm$",
-            line)
-        if m:
-            current_result.quality = int(m.group('quality_nominator')) / int(m.group('quality_denominator'))
-            current_result.signal_level = m.group('signal_level')
-            continue
-
-        m = re.match(r"ESSID:\"(?P<essid>.+)\"", line)
-        if m:
-            current_result.essid = m.group('essid')
-            session.add(current_result)
-            current_result = None
-
-    session.commit()
+def determine_ip(url, session):
+    try:
+        r = requests.get(url, timeout=20)
+        if r.status_code == requests.codes.ok:
+            exit_ip_entry = ExitIp(ip=r.text)
+            session.add(exit_ip_entry)
+            session.commit()
+            return r.text.strip()
+    except:
+        pass
+    print("Failed to determine exit ip", file=sys.stdout)
+    return "unknown"
 
 
-def plot(session, filter_regex):
-    networks = {}
-    scans = session.query(Scan).all()
-    scan_count = len(scans)
-    for result in session.query(Result).distinct(Result.mac):
-        networks[result.mac] = {
-            'label': "{} ({})".format(result.essid, result.mac),
-            'data': [0 for x in range(scan_count)]
-        }
+def determine_speed(url, exit_ip, session):
+    speedtest_entry = Speedtest(url=url, exit_ip=exit_ip)
+    begin = datetime.datetime.utcnow()
+    try:
+        r = requests.get(url, timeout=20)
+        if r.status_code == requests.codes.ok:
+            end = datetime.datetime.utcnow()
+            duration = end - begin
+            speedtest_entry.duration = duration.seconds + duration.microseconds / 1000000
+            speedtest_entry.file_size = int(r.headers['content-length'])
+            speedtest_entry.bytes_per_second = speedtest_entry.file_size / speedtest_entry.duration
+            speedtest_entry.http_code = r.status_code
+        else:
+            raise Exception
+    except:
+        print("Failed to fetch test file", file=sys.stdout)
+    finally:
+        session.add(speedtest_entry)
+        session.commit()
 
-    for index, scan in enumerate(session.query(Scan).all()):
-        # print("Scan '{}' at {}:".format(scan.description, scan.time))
-        for result in session.query(Result).filter(Result.scan == scan):
-            networks[result.mac]['data'][index] = result.quality
-            # print(" {}: {}".format(result.essid, result.quality))
 
-    fig, ax = plt.subplots(figsize=(20, 10))
-    for key, value in networks.items():
-        if re.match(filter_regex, value['label']):
-            plt.plot(value['data'], label=value['label'], marker="x")
+def plot(session, ip_filter_regex):
+    speeds = []
+    ips = []
 
-    plt.xlabel('Location/Time')
-    plt.ylabel('Quality')
-    plt.title('Quality vs Locality')
-    plt.xticks(range(scan_count), [x.description + "\n" + str(x.time) for x in scans], rotation=90)
+    last_speedtest = None
+    for current_speedtest in session.query(Speedtest).order_by(Speedtest.time).all():
+        exit_ip_str = current_speedtest.exit_ip.strip() if current_speedtest.exit_ip else ""
+        if re.match(ip_filter_regex, exit_ip_str):
+            speeds.append(current_speedtest.bytes_per_second)
+            if not last_speedtest or last_speedtest.exit_ip != current_speedtest.exit_ip:
+                ips.append(current_speedtest.exit_ip)
+            else:
+                ips.append("")
+            last_speedtest = current_speedtest
+
+    plt.plot(speeds, label=ip_filter_regex, marker="x")
+
+    plt.xlabel('IP address')
+    plt.ylabel('Speed [Byte/Second]')
+    plt.title('Real-World-Tor-Speed')
+    plt.xticks(range(len(ips)), ips, rotation=90)
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -121,22 +102,27 @@ def plot(session, filter_regex):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scan', nargs=2, metavar=('<interface>', '<description>'))
-    parser.add_argument('--database', default='plan-b-survey.db')
-    parser.add_argument('--plot', nargs=1, metavar=('<network_regex>'),
-                        help="Plot specified networks ('.*' for all)")
+    parser.add_argument('--testfile', nargs=1, metavar='<URL>', type=str,
+                        help='URL to file to determine the speed of the connection.\n'
+                             'E.g. https://plan-b.digitale-gesellschaft.ch/testing/testfile-10mb.img')
+    parser.add_argument('--database', default='plan-b-tor-speed.db')
+    parser.add_argument('--get-ip', nargs=1, metavar='<URL>', type=str,
+                        help='URL to retrieve the IP address of the Tor exit node.\n"'
+                             'E.g. https://plan-b.digitale-gesellschaft.ch/testing/ip.php')
+    parser.add_argument('--plot', nargs=1, metavar='<ip_regex>', help="Plot collected data")
     args = parser.parse_args()
 
-    if not (args.scan or args.plot):
+    if not (args.testfile or args.get_ip or args.plot):
         parser.print_help()
         exit(0)
 
     session = create_db_session(args.database)
 
-    if args.scan:
-        scan_object = scan(args.scan[0], args.scan[1], session)
-        analyze(scan_object, session)
-
+    ip = None
+    if args.get_ip:
+        ip = determine_ip(args.get_ip[0], session)
+    if args.testfile:
+        determine_speed(args.testfile[0], ip, session)
     if args.plot:
         plot(session, args.plot[0])
 

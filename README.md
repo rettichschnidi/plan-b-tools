@@ -20,5 +20,5 @@ sudo apt install python3-sqlalchemy python3-matplotlib
 
 ### Displaying Results ###
 ```
-./wifi-strength.py --plot
+./wifi-strength.py --plot .+
 ```

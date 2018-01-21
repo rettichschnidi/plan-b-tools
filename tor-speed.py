@@ -5,7 +5,7 @@ import re
 import sys
 
 import matplotlib.pyplot as plt
-from pip._vendor import requests
+import requests
 from sqlalchemy import Integer, Column, Text, DateTime, func, create_engine, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker

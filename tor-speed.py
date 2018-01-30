@@ -10,6 +10,8 @@ from sqlalchemy import Integer, Column, Text, DateTime, func, create_engine, Flo
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+proxies = {}
+
 Base = declarative_base()
 
 
@@ -41,7 +43,7 @@ def create_db_session(filename):
 
 def determine_ip(url, session):
     try:
-        r = requests.get(url, timeout=20)
+        r = requests.get(url, timeout=20, proxies=proxies)
         if r.status_code == requests.codes.ok:
             exit_ip_entry = ExitIp(ip=r.text)
             session.add(exit_ip_entry)
@@ -57,7 +59,7 @@ def determine_speed(url, exit_ip, session):
     speedtest_entry = Speedtest(url=url, exit_ip=exit_ip)
     begin = datetime.datetime.utcnow()
     try:
-        r = requests.get(url, timeout=20)
+        r = requests.get(url, timeout=20, proxies=proxies)
         if r.status_code == requests.codes.ok:
             end = datetime.datetime.utcnow()
             duration = end - begin
@@ -67,8 +69,8 @@ def determine_speed(url, exit_ip, session):
             speedtest_entry.http_code = r.status_code
         else:
             raise Exception
-    except:
-        print("Failed to fetch test file", file=sys.stdout)
+    except Exception as e:
+        print("Failed to fetch test file: {}".format(str(e)), file=sys.stdout)
     finally:
         session.add(speedtest_entry)
         session.commit()
@@ -110,6 +112,8 @@ def main():
                         help='URL to retrieve the IP address of the Tor exit node.\n"'
                              'E.g. https://plan-b.digitale-gesellschaft.ch/testing/ip.php')
     parser.add_argument('--plot', nargs=1, metavar='<ip_regex>', help="Plot collected data")
+    parser.add_argument('--proxy', nargs=1, help="Proxy to use for HTTP(S).\n"
+                                                 "E.g. socks5://localhost:9050")
     args = parser.parse_args()
 
     if not (args.testfile or args.get_ip or args.plot):
@@ -119,6 +123,10 @@ def main():
     session = create_db_session(args.database)
 
     ip = None
+    if args.proxy:
+        proxies['http'] = args.proxy[0]
+        proxies['https'] = args.proxy[0]
+        proxies['ftp'] = args.proxy[0]
     if args.get_ip:
         ip = determine_ip(args.get_ip[0], session)
     if args.testfile:

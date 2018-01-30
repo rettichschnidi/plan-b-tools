@@ -2,12 +2,12 @@
 
 Some tools to assist the development of Plan B.
 
-## Survey ##
+## WiFi Strength ##
 Simple tool to measure and rank the signal strength of wireless access points.
 
 ### Installation ###
 ```
-sudo apt install python3-sqlalchemy python3-matplotlib
+sudo apt install python3-sqlalchemy python3-matplotlib python3-socks
 ```
 
 ### Collecting Samples ###

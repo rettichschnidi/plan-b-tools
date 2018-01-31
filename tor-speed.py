@@ -76,7 +76,7 @@ def determine_speed(url, exit_ip, session):
         session.commit()
 
 
-def plot(session, ip_filter_regex):
+def plot(session, ip_filter_regex, header):
     speeds = []
     ips = []
 
@@ -95,7 +95,7 @@ def plot(session, ip_filter_regex):
 
     plt.xlabel('IP address')
     plt.ylabel('Speed [Byte/Second]')
-    plt.title('Real-World-Tor-Speed')
+    plt.title('Real-World-Tor-Speed: ' + header)
     plt.xticks(range(len(ips)), ips, rotation=90)
     plt.legend()
     plt.tight_layout()
@@ -132,7 +132,7 @@ def main():
     if args.testfile:
         determine_speed(args.testfile[0], ip, session)
     if args.plot:
-        plot(session, args.plot[0])
+        plot(session, args.plot[0], args.database)
 
 
 if __name__ == '__main__':

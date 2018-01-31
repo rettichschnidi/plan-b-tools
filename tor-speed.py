@@ -107,7 +107,7 @@ def main():
     parser.add_argument('--testfile', nargs=1, metavar='<URL>', type=str,
                         help='URL to file to determine the speed of the connection.\n'
                              'E.g. https://plan-b.digitale-gesellschaft.ch/testing/testfile-10mb.img')
-    parser.add_argument('--database', default='plan-b-tor-speed.db')
+    parser.add_argument('--database', default='plan-b-tor-speed.sqlite')
     parser.add_argument('--get-ip', nargs=1, metavar='<URL>', type=str,
                         help='URL to retrieve the IP address of the Tor exit node.\n"'
                              'E.g. https://plan-b.digitale-gesellschaft.ch/testing/ip.php')

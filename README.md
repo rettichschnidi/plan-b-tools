@@ -22,3 +22,6 @@ sudo apt install python3-sqlalchemy python3-matplotlib python3-socks
 ```
 ./wifi-strength.py --plot .+
 ```
+
+## Tor Speed ##
+TBD
